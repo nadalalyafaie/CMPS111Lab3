@@ -14,7 +14,11 @@
 #ifndef NADALLAB3_H
 #define NADALLAB3_H
 
+#include <stdbool.h>
+#include <stdint.h>
+#include "NadalLab3.c"
 
+void insertIntoStack(const char *cmdline, void **esp);
 
 #endif /* NADALLAB3_H */
 
