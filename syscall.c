@@ -58,13 +58,17 @@ static void syscall_handler(struct intr_frame *);
 static void write_handler(struct intr_frame *);
 static void exit_handler(struct intr_frame *);
 
-
-static void create_handler(struct intr_frame *f);
-static void open_handler(struct intr_frame *f);
-static void read_handler(struct intr_frame *f);
-static void close_handler(struct intr_frame *f);
-static void exec_handler(struct intr_frame *f);
-static void wait_handler(struct intr_frame *f);
+int sys_create(char *, size_t size);
+int sys_open(const char *filename);
+int sys_close(int handle);
+off_t sys_read(int handle, void *buf, off_t size);
+static void create_handler(struct intr_frame *);
+struct fileDescription *searchFileDescription(int handle);
+static void open_handler(struct intr_frame *);
+static void read_handler(struct intr_frame *);
+static void close_handler(struct intr_frame *);
+//static void exec_handler(struct intr_frame *);
+//static void wait_handler(struct intr_frame *);
 
 
 void
@@ -90,14 +94,6 @@ syscall_handler(struct intr_frame *f)
   case SYS_HALT: 
     shutdown_power_off();
     break;
-
-  case SYS_EXIT: 
-    exit_handler(f);
-    break;
-      
-  case SYS_WRITE: 
-    write_handler(f);
-    break;
     
   case SYS_CREATE:
     create_handler(f);
@@ -107,23 +103,30 @@ syscall_handler(struct intr_frame *f)
     open_handler(f);
     break;
     
-  case SYS_READ:
-    read_handler(f);
-    break;
-    
   case SYS_CLOSE:
     close_handler(f);
     break;
-    
-  case SYS_EXEC:
-    exec_handler(f);
-    break;
-    
-  case SYS_WAIT:
-    wait_handler(f);
-    break;
           
-      
+  case SYS_READ:
+    read_handler(f);
+    break;
+
+//  case SYS_EXEC:
+//    exec_handler(f);
+//    break;
+//
+//  case SYS_WAIT:
+//    wait_handler(f);
+//    break;
+//
+  case SYS_EXIT:
+    exit_handler(f);
+    break;
+//
+  case SYS_WRITE:
+    write_handler(f);
+    break;
+//
 
   default:
     printf("[ERROR] system call %d is unimplemented!\n", syscall);
@@ -191,18 +194,44 @@ static void write_handler(struct intr_frame *f)
 //The handler takes off the arguements from the stack and calls the system call
 //function that will run it
 
+struct fileDescription {
+    int handle;
+    struct file *file;
+    struct list_elem elem;
+};
+
+struct fileDescription *searchFileDescription(int handle){
+    
+    struct thread *currentThread = thread_current();
+    struct list_elem *element = list_begin(&currentThread->fileTable);
+    struct fileDescription *fileDescript = NULL;
+    
+    while(element != list_end(&currentThread->fileTable)){
+        
+        fileDescript = list_entry(element, struct fileDescription, elem);
+
+        if(handle == fileDescript->handle){
+            break;
+
+        }else{
+            if(list_next(element) != NULL){
+                element = list_next(element);
+            }
+        }
+    }
+    return fileDescript;
+}
+
 /* - CREATE - */
 
 int sys_create(char *name, size_t size) {
-    //printf("create called '%s'", name);
-    
-    //create copy of string
-    char *copyName = (char *) palloc_get_page(0);
+
+    //char *copyName = (char *) palloc_get_page(0);
     bool didCreate;
     
-    strlcpy(copyName, name, PGSIZE);
-    didCreate = filesys_create(copyName,size,false);
-    palloc_free_page(copyName);
+    //strlcpy(copyName, name, PGSIZE);
+    didCreate = filesys_create(name,size,false);
+    //palloc_free_page(copyName);
     
     return didCreate;
 }
@@ -219,81 +248,114 @@ static void create_handler(struct intr_frame *f){
 
 /* - FOPEN - */
 
-int sys_open(const char *restrict filename, const char *restrict mode){
-    printf("open called");
+int sys_open(const char *filename){
+    
+    struct fileDescription *fileDescript = palloc_get_page(0);
+    struct thread *currentThread = thread_current();
+    int handle = -1;
+    
+    if(fileDescript != NULL){
+        
+        fileDescript->file = filesys_open(filename);
+        
+        if(fileDescript->file != NULL) {
+            
+            //This handle is assigned to an individual file that is opened.
+            currentThread->handle++;
+            handle = currentThread->handle;
+            fileDescript->handle = handle;
+            
+            list_push_front(&(currentThread->fileTable), &(fileDescript->elem));
+            
+        }
+    }
+    
+    return handle;
 }
 
 static void open_handler(struct intr_frame *f){
-    const char *restrict filename;
-    const char *restrict mode;
+    const char *filename;
     
     umem_read(f->esp + 4, &filename, sizeof(filename));
-    umem_read(f->esp + 8, &mode, sizeof(mode));
     
-    f->eax = sys_open(filename, mode);
+    f->eax = sys_open(filename);
 }
 
 /* - FREAD - */
 
-uint32_t sys_read(int fd, void *buf, size_t count){
-    printf("read called");
+off_t sys_read(int handle, void *buf, off_t size){
+    
+    struct fileDescription *fileDescript = palloc_get_page(0);
+    
+    fileDescript = searchFileDescription(handle);
+    
+    return file_read(fileDescript->file, buf, size);
+    
 }
 
 static void read_handler(struct intr_frame *f){
-    int fd;
+    int handle;
     void *buf;
     size_t count;
-    
-    umem_read(f->esp + 4, &fd, sizeof(fd));
+
+    umem_read(f->esp + 4, &handle, sizeof(handle));
     umem_read(f->esp + 8, &buf, sizeof(buf));
     umem_read(f->esp + 12, &count, sizeof(count));
-    
-    f->eax = sys_read(fd, buf, count);
+
+    f->eax = sys_read(handle, buf, count);
 }
 
 /* - CLOSE - */
 
-int sys_close(int stream){
-    printf("close called");
+int sys_close(int handle){
+    
+    struct fileDescription *fileDescript = searchFileDescription(handle);
+    
+    file_close (fileDescript->file);
+    
+    list_remove(&fileDescript->elem);
+    
+    return 0;
 }
 
 static void close_handler(struct intr_frame *f){
-    int stream; //Was FILE *
+    int handle; //Was FILE *
     
-    umem_read(f->esp + 4, &stream, sizeof(stream));
+    umem_read(f->esp + 4, &handle, sizeof(handle));
     
-    f->eax = sys_close(stream);
+    f->eax = sys_close(handle);
 }
 
 /* - EXEC - */
 
-pid_t sys_exec(char *name) {
-    printf("exec called");
-    return 0;
-}
+//pid_t sys_exec(char *name) {
+//    printf("exec called");
+//    return 0;
+//}
+//
+//static void exec_handler(struct intr_frame *f){
+//    char *name;
+//
+//    umem_read(f->esp + 4, &name, sizeof(name));
+//
+//    f->eax = sys_exec(name);
+//}
+//
+///* - WAIT - */
+//
+//int sys_wait(pid_t process) {
+//    printf("wait called");
+//    return 0;
+//}
+//
+//static void wait_handler(struct intr_frame *f){
+//    pid_t process;
+//
+//
+//    umem_read(f->esp + 4, &process, sizeof(process));
+//
+//    f->eax = sys_wait(process);
+//}
 
-static void exec_handler(struct intr_frame *f){
-    char *name;
-    
-    umem_read(f->esp + 4, &name, sizeof(name));
-    
-    f->eax = sys_exec(name);
-}
-
-/* - WAIT - */
-
-int sys_wait(pid_t process) {
-    printf("wait called");
-    return 0;
-}
-
-static void wait_handler(struct intr_frame *f){
-    pid_t process;
-    
-    
-    umem_read(f->esp + 4, &process, sizeof(process));
-    
-    f->eax = sys_wait(process);
-}
 
 

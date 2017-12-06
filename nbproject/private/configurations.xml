@@ -2,27 +2,9 @@
 <configurationDescriptor version="97">
   <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
     <df root="." name="0">
-      <df name="build">
-        <df name="devices">
-        </df>
-        <df name="filesys">
-        </df>
-        <df name="lib">
-          <df name="kernel">
-          </df>
-          <df name="user">
-          </df>
-        </df>
-        <df name="tests">
-          <df name="userprog">
-          </df>
-        </df>
-        <df name="threads">
-          <in>kernel.lds.s</in>
-        </df>
-        <df name="userprog">
-        </df>
-      </df>
+      <in>._NadalLab3.c</in>
+      <in>._syscall.c</in>
+      <in>._syscall.h</in>
       <in>NadalLab3.c</in>
       <in>NadalLab3.h</in>
       <in>exception.c</in>

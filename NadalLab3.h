@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include "NadalLab3.c"
 
-void insertIntoStack(const char *cmdline, void **esp);
+void insertIntoStack(const char *, void **esp);
 
 #endif /* NADALLAB3_H */
 

@@ -40,18 +40,4 @@
 void syscall_init(void);
 void sys_exit(int);
 
-static void syscall_handler(struct intr_frame *);
-
-static void write_handler(struct intr_frame *);
-static void exit_handler(struct intr_frame *);
-
-
-//Will need to remove later
-static void create_handler(struct intr_frame *f);
-static void open_handler(struct intr_frame *f);
-static void read_handler(struct intr_frame *f);
-static void close_handler(struct intr_frame *f);
-static void exec_handler(struct intr_frame *f);
-static void wait_handler(struct intr_frame *f);
-
 #endif /* userprog/syscall.h */

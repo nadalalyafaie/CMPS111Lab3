@@ -15,6 +15,9 @@
 #include "threads/palloc.h"
 
 #define WORDSIZE 4
+//MARK : - Prototypes
+void insertIntoStack(const char *cmdline UNUSED, void **esp);
+
 
 void insertIntoStack(const char *cmdline UNUSED, void **esp){
     
